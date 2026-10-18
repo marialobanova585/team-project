@@ -1,3 +1,3 @@
-.\windows_version\windows_backup.ps1 -LogPath ".\windows_version\test-logs"
+.\windows_backup.ps1 -LogPath ".\test-logs"
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\windows_version\windows_tests.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\windows_tests.ps1"
