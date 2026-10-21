@@ -2,27 +2,58 @@
 TEST_LOG_DIR="./test_log"
 TEST_BACKUP_DIR="/backup"
 MAIN_SCRIPT="./main_backup.sh"
-chmod +x "$MAIN_SCRIPT" 2>/dev/null
-setup_env() {
-rm -rf "$TEST_LOG_DIR"
-mkdir -p "$TEST_LOG_DIR"
-sudo rm -f "$TEST_BACKUP_DIR"/log_backup_*.tar.gz 2>/dev/null
-}
-echo "   СТАРТ ТЕСТОВ   "
-setup_env
-echo "Тест 1: Пустая папка"
-$MAIN_SCRIPT -d "$TEST_LOG_DIR" -m 100 -t 50 -c 2
-setup_env
-echo "Тест 2: Превышение порога"
-dd if=/dev/zero of="$TEST_LOG_DIR/old_file1.log" bs=1M count=5 2>/dev/null
-touch -d "3 days ago" "$TEST_LOG_DIR/old_file1.log"
-dd if=/dev/zero of="$TEST_LOG_DIR/new_file.log" bs=1M count=5 2>/dev/null
-touch -d "1 day ago" "$TEST_LOG_DIR/new_file.log"
-$MAIN_SCRIPT -d "$TEST_LOG_DIR" -m 10 -t 40 -c 1
-LATEST_BACKUP=$(ls -t "$TEST_BACKUP_DIR"/log_backup_*.tar.gz 2>/dev/null | head -n 1)
-if [ -f "$LATEST_BACKUP" ]; then
-echo -e "\033[0;32m[PASS]\033[0m Архив создан: $LATEST_BACKUP"
-else
-echo -e "\033[0;31m[FAIL]\033[0m Архив не найден!"
+START_TIME=$(date +%s)
+pass() { echo "[PASS] $*"; }
+fail() { echo "[FAIL] $*"; }
+if [ ! -f "$MAIN_SCRIPT" ]; then
+    echo "Ошибка: нет файла $MAIN_SCRIPT"
+    exit 1
 fi
-
+chmod +x "$MAIN_SCRIPT"
+clean_archives() {
+    find "$TEST_BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -newermt "@$START_TIME" -delete 2>/dev/null
+}
+setup() {
+    rm -rf "$TEST_LOG_DIR"
+    mkdir -p "$TEST_LOG_DIR"
+    clean_archives
+}
+echo "Тест 1: лимит не превышен"
+setup
+touch "$TEST_LOG_DIR/file1.log"
+"$MAIN_SCRIPT" "$TEST_LOG_DIR" 99 1
+rc=$?
+if [ $rc -ne 0 ]; then
+    fail "main_backup.sh завершился с ошибкой (код $rc)"
+elif [ -z "$(find "$TEST_BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -newermt "@$START_TIME" 2>/dev/null)" ]; then
+    pass "новый архив не создан"
+else
+    fail "архив создан, хотя не должен был"
+fi
+echo
+echo "Тест 2: лимит превышен"
+setup
+touch -d "2 days ago" "$TEST_LOG_DIR/old1.log"
+touch -d "2 days ago" "$TEST_LOG_DIR/old2.log"
+touch                  "$TEST_LOG_DIR/new.log"
+"$MAIN_SCRIPT" "$TEST_LOG_DIR" 0 2
+rc=$?
+if [ $rc -ne 0 ]; then
+    fail "main_backup.sh завершился с ошибкой (код $rc)"
+else
+    ARCHIVE=$(find "$TEST_BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -newermt "@$START_TIME" 2>/dev/null | head -n1)
+    if [ -z "$ARCHIVE" ]; then
+        fail "архив не создан"
+    else
+        pass "архив создан"
+        if [ ! -f "$TEST_LOG_DIR/old1.log" ] && [ ! -f "$TEST_LOG_DIR/old2.log" ] && [ -f "$TEST_LOG_DIR/new.log" ]; then
+            pass "старые файлы удалены, новый сохранён"
+        else
+            fail "неверный набор файлов после архивации"
+        fi
+    fi
+fi
+clean_archives
+rm -rf "$TEST_LOG_DIR"
+echo
+echo "Готово"
