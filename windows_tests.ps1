@@ -1,12 +1,3 @@
-$ErrorActionPreference = "Stop"
-
-$scriptPath = Join-Path $PSScriptRoot "windows_backup.ps1"
-$tempRoot = Join-Path $env:TEMP ("backup_test_" + [guid]::NewGuid().ToString("N"))
-$logPath = Join-Path $tempRoot "logs"
-$backupPath = Join-Path $tempRoot "backup"
-
-New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-
 try {
     Set-Content -Path (Join-Path $logPath "old.log") -Value ("A" * 3000)
     Set-Content -Path (Join-Path $logPath "new.log") -Value ("B" * 3000)
@@ -24,12 +15,12 @@ try {
         throw "FAIL: expected one archive"
     }
 
-    $contents = @(tar.exe -tzf $archives[0].FullName)
+    $contents = @(tar.exe -tzf $archives.FullName)
     if ($LASTEXITCODE -ne 0) {
         throw "FAIL: archive could not be read"
     }
 
-    if ($contents.Count -ne 1 -or $contents[0] -ne "old.log") {
+    if ($contents.Count -ne 1 -or $contents -ne "old.log") {
         throw "FAIL: archive does not contain only the oldest file"
     }
 
