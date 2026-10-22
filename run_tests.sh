@@ -1,3 +1,4 @@
+#!/bin/bash
 TEST_LOG_DIR="./test_log"
 TEST_BACKUP_DIR="/backup"
 MAIN_SCRIPT="./main_backup.sh"
