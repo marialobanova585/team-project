@@ -1,4 +1,4 @@
-
+#!/bin/bash
 folder_path="$1"
 N_percent="$2"
 M_files="$3"
